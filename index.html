@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Solana Token Sniper</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            min-height: 100vh;
+        }
+        @keyframes pulse-ring {
+            0% { transform: scale(0.95); opacity: 1; }
+            50% { transform: scale(1); opacity: 0.7; }
+            100% { transform: scale(0.95); opacity: 1; }
+        }
+        .pulse-ring {
+            animation: pulse-ring 2s ease-in-out infinite;
+        }
+        .safety-excellent { background: linear-gradient(135deg, #10b981 0%, #059669 100%); }
+        .safety-good { background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); }
+        .safety-medium { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); }
+        .safety-low { background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); }
+        .safety-danger { background: linear-gradient(135deg, #7f1d1d 0%, #991b1b 100%); }
+    </style>
+</head>
+<body class="p-6">
+    <div class="max-w-7xl mx-auto">
+        <!-- Header -->
+        <div class="text-center mb-8">
+            <h1 class="text-5xl font-bold text-white mb-2">🎯 Solana Token Sniper</h1>
+            <p class="text-blue-300 text-lg">Detect new token launches instantly & analyze safety</p>
+        </div>
+
+        <!-- Control Panel -->
+        <div class="grid md:grid-cols-2 gap-6 mb-6">
+            <!-- Settings Card -->
+            <div class="bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-white/20">
+                <h2 class="text-2xl font-bold text-white mb-4">⚙️ Settings</h2>
+                
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-white mb-2 font-medium">🔑 BitQuery API Key</label>
+                        <input type="password" id="apiKey" 
+                               value="ory_at_JzlLDmQRzM_bMRIrwvurNai-kIrv5heF1Ivq_Z9irFk.tAOJDd6ME8nbsEuddHewuYCuZ_yhl5gu_EoDGDrlgzU"
+                               class="w-full px-4 py-2 rounded-lg bg-white/20 text-white placeholder-white/50 border border-white/30 focus:outline-none focus:border-blue-400">
+                    </div>
+
+                    <div>
+                        <label class="block text-white mb-2 font-medium">💰 Min Liquidity (USD)</label>
+                        <input type="number" id="minLiquidity" value="5000"
+                               class="w-full px-4 py-2 rounded-lg bg-white/20 text-white border border-white/30 focus:outline-none focus:border-blue-400">
+                    </div>
+
+                    <div>
+                        <label class="block text-white mb-2 font-medium">📊 Min Safety Score</label>
+                        <select id="minSafetyScore"
+                                class="w-full px-4 py-2 rounded-lg bg-white/20 text-white border border-white/30 focus:outline-none focus:border-blue-400">
+                            <option value="0">Show All (0+)</option>
+                            <option value="40">Medium+ (40+)</option>
+                            <option value="60" selected>Good+ (60+)</option>
+                            <option value="80">Excellent (80+)</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-white mb-2 font-medium">⏱️ Check Interval</label>
+                        <select id="checkInterval"
+                                class="w-full px-4 py-2 rounded-lg bg-white/20 text-white border border-white/30 focus:outline-none focus:border-blue-400">
+                            <option value="10000">10 seconds</option>
+                            <option value="30000" selected>30 seconds</option>
+                            <option value="60000">1 minute</option>
+                            <option value="300000">5 minutes</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="mt-6 space-y-2">
+                    <button onclick="startSniper()" id="startBtn"
+                            class="w-full bg-gradient-to-r from-green-500 to-emerald-600 text-white py-3 rounded-lg font-bold hover:from-green-600 hover:to-emerald-700 transition-all">
+                        ▶️ Start Sniping
+                    </button>
+                    <button onclick="stopSniper()" id="stopBtn" disabled
+                            class="w-full bg-gradient-to-r from-red-500 to-rose-600 text-white py-3 rounded-lg font-bold hover:from-red-600 hover:to-rose-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+                        ⏸️ Stop Sniping
+                    </button>
+                </div>
+            </div>
+
+            <!-- Status Card -->
+            <div class="bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-white/20">
+                <h2 class="text-2xl font-bold text-white mb-4">📡 Status</h2>
+                
+                <div class="space-y-4">
+                    <div class="bg-white/5 rounded-lg p-4 border border-white/10">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-white/70">Sniper Status</span>
+                            <div id="statusIndicator" class="w-3 h-3 rounded-full bg-gray-500"></div>
+                        </div>
+                        <div id="statusText" class="text-2xl font-bold text-white">Idle</div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="bg-blue-500/20 rounded-lg p-4 border border-blue-400/30">
+                            <div class="text-blue-200 text-sm mb-1">Tokens Found</div>
+                            <div id="tokensFound" class="text-white text-3xl font-bold">0</div>
+                        </div>
+                        <div class="bg-green-500/20 rounded-lg p-4 border border-green-400/30">
+                            <div class="text-green-200 text-sm mb-1">High Quality</div>
+                            <div id="highQuality" class="text-white text-3xl font-bold">0</div>
+                        </div>
+                    </div>
+
+                    <div class="bg-white/5 rounded-lg p-4 border border-white/10">
+                        <div class="text-white/70 text-sm mb-2">Last Check</div>
+                        <div id="lastCheck" class="text-white font-mono">Never</div>
+                    </div>
+
+                    <div class="bg-white/5 rounded-lg p-4 border border-white/10">
+                        <div class="text-white/70 text-sm mb-2">Next Check In</div>
+                        <div id="nextCheck" class="text-white font-mono">--</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Results Section -->
+        <div class="bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-white/20">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-2xl font-bold text-white">🚀 New Token Launches</h2>
+                <button onclick="clearResults()" class="text-white/70 hover:text-white text-sm">
+                    🗑️ Clear All
+                </button>
+            </div>
+            
+            <div id="resultsContainer" class="space-y-4">
+                <div class="text-center text-white/50 py-12">
+                    <div class="text-6xl mb-4">🎯</div>
+                    <p class="text-xl">Start sniping to detect new token launches</p>
+                    <p class="text-sm mt-2">New tokens will appear here automatically</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Audio for alerts -->
+    <audio id="alertSound" preload="auto">
+        <source src="data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBzKN0fPTgjMGHm7A7+OZURE..." type="audio/wav">
+    </audio>
+
+    <script>
+        let sniperInterval = null;
+        let isRunning = false;
+        let tokensFoundCount = 0;
+        let highQualityCount = 0;
+        let lastCheckTime = null;
+        let seenTokens = new Set();
+        let countdownInterval = null;
+
+        function startSniper() {
+            const apiKey = document.getElementById('apiKey').value;
+            if (!apiKey) {
+                alert('⚠️ Please enter your BitQuery API key');
+                return;
+            }
+
+            isRunning = true;
+            document.getElementById('startBtn').disabled = true;
+            document.getElementById('stopBtn').disabled = false;
+            document.getElementById('statusIndicator').className = 'w-3 h-3 rounded-full bg-green-500 pulse-ring';
+            document.getElementById('statusText').textContent = 'Active 🟢';
+
+            // Run immediately
+            checkNewTokens();
+
+            // Then run on interval
+            const interval = parseInt(document.getElementById('checkInterval').value);
+            sniperInterval = setInterval(checkNewTokens, interval);
+            
+            startCountdown(interval);
+        }
+
+        function stopSniper() {
+            isRunning = false;
+            clearInterval(sniperInterval);
+            clearInterval(countdownInterval);
+            document.getElementById('startBtn').disabled = false;
+            document.getElementById('stopBtn').disabled = true;
+            document.getElementById('statusIndicator').className = 'w-3 h-3 rounded-full bg-gray-500';
+            document.getElementById('statusText').textContent = 'Stopped 🔴';
+            document.getElementById('nextCheck').textContent = '--';
+        }
+
+        function startCountdown(interval) {
+            clearInterval(countdownInterval);
+            let remaining = interval / 1000;
+            
+            countdownInterval = setInterval(() => {
+                remaining--;
+                if (remaining <= 0) {
+                    remaining = interval / 1000;
+                }
+                document.getElementById('nextCheck').textContent = `${remaining}s`;
+            }, 1000);
+        }
+
+        async function checkNewTokens() {
+            const apiKey = document.getElementById('apiKey').value;
+            lastCheckTime = new Date().toLocaleTimeString();
+            document.getElementById('lastCheck').textContent = lastCheckTime;
+
+            try {
+                // Query for recent DEX trades (new liquidity pools)
+                const query = {
+                    query: `
+                        query {
+                            Solana {
+                                DEXTradeByTokens(
+                                    where: {
+                                        Block: {
+                                            Time: {
+                                                since: "${new Date(Date.now() - 300000).toISOString()}"
+                                            }
+                                        }
+                                        Trade: {
+                                            Dex: {
+                                                ProgramAddress: {
+                                                    in: ["675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8"]
+                                                }
+                                            }
+                                        }
+                                    }
+                                    orderBy: {descending: Block_Time}
+                                    limit: {count: 10}
+                                ) {
+                                    Trade {
+                                        Currency {
+                                            Symbol
+                                            Name
+                                            MintAddress
+                                        }
+                                        Dex {
+                                            ProtocolName
+                                        }
+                                    }
+                                    bought: sum(of: Trade_Side_AmountInUSD, if: {Trade: {Side: {Type: {is: buy}}}})
+                                    sold: sum(of: Trade_Side_AmountInUSD, if: {Trade: {Side: {Type: {is: sell}}}})
+                                    tradeCount: count
+                                    Block {
+                                        Time
+                                    }
+                                }
+                            }
+                        }
+                    `
+                };
+
+                const response = await fetch('https://streaming.bitquery.io/graphql', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${apiKey}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(query)
+                });
+
+                const data = await response.json();
+                
+                if (data.errors) {
+                    console.error('API Error:', data.errors);
+                    return;
+                }
+
+                const tokens = data.data?.Solana?.DEXTradeByTokens || [];
+                const minLiquidity = parseFloat(document.getElementById('minLiquidity').value);
+                const minSafety = parseInt(document.getElementById('minSafetyScore').value);
+
+                for (const token of tokens) {
+                    const mintAddress = token.Trade.Currency.MintAddress;
+                    
+                    // Skip if we've already seen this token
+                    if (seenTokens.has(mintAddress)) continue;
+                    
+                    const liquidity = (token.bought || 0) + (token.sold || 0);
+                    
+                    // Skip if below minimum liquidity
+                    if (liquidity < minLiquidity) continue;
+
+                    // Analyze safety
+                    const analysis = analyzeToken(token, liquidity);
+                    
+                    // Skip if below minimum safety score
+                    if (analysis.safetyScore < minSafety) continue;
+
+                    // Mark as seen
+                    seenTokens.add(mintAddress);
+                    
+                    // Add to results
+                    addTokenCard(token, analysis);
+                    
+                    // Update counters
+                    tokensFoundCount++;
+                    if (analysis.safetyScore >= 60) {
+                        highQualityCount++;
+                        playAlert();
+                    }
+                    
+                    document.getElementById('tokensFound').textContent = tokensFoundCount;
+                    document.getElementById('highQuality').textContent = highQualityCount;
+                }
+
+            } catch (error) {
+                console.error('Error checking tokens:', error);
+            }
+        }
+
+        function analyzeToken(token, liquidity) {
+            let score = 0;
+            const flags = [];
+            const positives = [];
+
+            // Liquidity check (0-30 points)
+            if (liquidity > 50000) {
+                score += 30;
+                positives.push('High liquidity ($50k+)');
+            } else if (liquidity > 20000) {
+                score += 20;
+                positives.push('Good liquidity ($20k+)');
+            } else if (liquidity > 10000) {
+                score += 15;
+                positives.push('Moderate liquidity ($10k+)');
+            } else {
+                score += 5;
+                flags.push('Low liquidity');
+            }
+
+            // Trade count (0-20 points)
+            const trades = token.tradeCount || 0;
+            if (trades > 100) {
+                score += 20;
+                positives.push('Very active trading');
+            } else if (trades > 50) {
+                score += 15;
+                positives.push('Active trading');
+            } else if (trades > 20) {
+                score += 10;
+                positives.push('Some trading activity');
+            } else {
+                flags.push('Low trade count');
+            }
+
+            // Buy/Sell ratio (0-25 points)
+            const buyAmount = token.bought || 0;
+            const sellAmount = token.sold || 0;
+            const ratio = buyAmount / (sellAmount || 1);
+            
+            if (ratio > 2) {
+                score += 25;
+                positives.push('Strong buy pressure');
+            } else if (ratio > 1.2) {
+                score += 15;
+                positives.push('More buyers than sellers');
+            } else if (ratio > 0.8) {
+                score += 10;
+            } else {
+                flags.push('More selling than buying');
+            }
+
+            // Age check (0-25 points) - newer is riskier but more opportunity
+            const age = Date.now() - new Date(token.Block.Time).getTime();
+            const ageMinutes = age / 1000 / 60;
+            
+            if (ageMinutes < 5) {
+                score += 25;
+                positives.push('🔥 Brand new launch!');
+            } else if (ageMinutes < 15) {
+                score += 20;
+                positives.push('Very recent launch');
+            } else if (ageMinutes < 60) {
+                score += 15;
+                positives.push('Recent launch');
+            } else {
+                score += 10;
+            }
+
+            return {
+                safetyScore: Math.min(100, score),
+                flags,
+                positives,
+                liquidity,
+                buyAmount,
+                sellAmount,
+                trades
+            };
+        }
+
+        function addTokenCard(token, analysis) {
+            const container = document.getElementById('resultsContainer');
+            
+            // Remove empty state if present
+            if (tokensFoundCount === 0) {
+                container.innerHTML = '';
+            }
+
+            const safetyClass = 
+                analysis.safetyScore >= 80 ? 'safety-excellent' :
+                analysis.safetyScore >= 60 ? 'safety-good' :
+                analysis.safetyScore >= 40 ? 'safety-medium' :
+                analysis.safetyScore >= 20 ? 'safety-low' : 'safety-danger';
+
+            const safetyLabel = 
+                analysis.safetyScore >= 80 ? 'Excellent' :
+                analysis.safetyScore >= 60 ? 'Good' :
+                analysis.safetyScore >= 40 ? 'Medium' :
+                analysis.safetyScore >= 20 ? 'Low' : 'Danger';
+
+            const card = document.createElement('div');
+            card.className = 'bg-white/5 rounded-xl p-6 border border-white/10 hover:border-white/20 transition-all';
+            card.innerHTML = `
+                <div class="flex items-start justify-between mb-4">
+                    <div class="flex-1">
+                        <div class="flex items-center gap-3 mb-2">
+                            <h3 class="text-2xl font-bold text-white">${token.Trade.Currency.Symbol || 'Unknown'}</h3>
+                            <span class="text-sm text-white/60">${token.Trade.Currency.Name || 'Unknown Token'}</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <a href="https://gmgn.ai/sol/address/${token.Trade.Currency.MintAddress}" 
+                               target="_blank"
+                               class="text-blue-400 hover:text-blue-300 font-mono text-xs break-all underline">
+                                ${token.Trade.Currency.MintAddress}
+                            </a>
+                            <button onclick="copyToClipboard('${token.Trade.Currency.MintAddress}')"
+                                    class="bg-blue-500/30 hover:bg-blue-500/50 text-white px-2 py-1 rounded text-xs">
+                                📋
+                            </button>
+                        </div>
+                    </div>
+                    <div class="${safetyClass} px-4 py-2 rounded-lg text-white font-bold">
+                        ${analysis.safetyScore}/100
+                        <div class="text-xs opacity-80">${safetyLabel}</div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-3 gap-4 mb-4">
+                    <div class="bg-white/5 rounded-lg p-3">
+                        <div class="text-white/60 text-xs mb-1">Liquidity</div>
+                        <div class="text-white font-bold">$${analysis.liquidity.toLocaleString(undefined, {maximumFractionDigits: 0})}</div>
+                    </div>
+                    <div class="bg-white/5 rounded-lg p-3">
+                        <div class="text-white/60 text-xs mb-1">Trades</div>
+                        <div class="text-white font-bold">${analysis.trades}</div>
+                    </div>
+                    <div class="bg-white/5 rounded-lg p-3">
+                        <div class="text-white/60 text-xs mb-1">Buy/Sell</div>
+                        <div class="text-white font-bold">${(analysis.buyAmount / (analysis.sellAmount || 1)).toFixed(2)}x</div>
+                    </div>
+                </div>
+
+                ${analysis.positives.length > 0 ? `
+                    <div class="mb-3">
+                        <div class="text-green-400 text-sm font-semibold mb-2">✅ Positives:</div>
+                        <div class="flex flex-wrap gap-2">
+                            ${analysis.positives.map(p => `<span class="bg-green-500/20 text-green-300 px-3 py-1 rounded-full text-xs">${p}</span>`).join('')}
+                        </div>
+                    </div>
+                ` : ''}
+
+                ${analysis.flags.length > 0 ? `
+                    <div class="mb-3">
+                        <div class="text-yellow-400 text-sm font-semibold mb-2">⚠️ Red Flags:</div>
+                        <div class="flex flex-wrap gap-2">
+                            ${analysis.flags.map(f => `<span class="bg-yellow-500/20 text-yellow-300 px-3 py-1 rounded-full text-xs">${f}</span>`).join('')}
+                        </div>
+                    </div>
+                ` : ''}
+
+                <div class="flex gap-2 mt-4">
+                    <a href="https://raydium.io/swap/?inputCurrency=sol&outputCurrency=${token.Trade.Currency.MintAddress}" 
+                       target="_blank"
+                       class="flex-1 bg-blue-500/30 hover:bg-blue-500/50 text-white py-2 px-4 rounded-lg font-medium text-center transition-all">
+                        🔄 Trade on Raydium
+                    </a>
+                    <a href="https://dexscreener.com/solana/${token.Trade.Currency.MintAddress}" 
+                       target="_blank"
+                       class="flex-1 bg-purple-500/30 hover:bg-purple-500/50 text-white py-2 px-4 rounded-lg font-medium text-center transition-all">
+                        📊 View Chart
+                    </a>
+                </div>
+
+                <div class="mt-3 text-white/40 text-xs text-right">
+                    Detected: ${new Date(token.Block.Time).toLocaleTimeString()}
+                </div>
+            `;
+
+            container.insertBefore(card, container.firstChild);
+        }
+
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text).then(() => {
+                // Could add visual feedback here
+            });
+        }
+
+        function playAlert() {
+            try {
+                const audio = document.getElementById('alertSound');
+                audio.play().catch(e => console.log('Audio play failed:', e));
+            } catch (e) {
+                console.log('Audio not supported');
+            }
+        }
+
+        function clearResults() {
+            if (confirm('Clear all results?')) {
+                document.getElementById('resultsContainer').innerHTML = `
+                    <div class="text-center text-white/50 py-12">
+                        <div class="text-6xl mb-4">🎯</div>
+                        <p class="text-xl">Start sniping to detect new token launches</p>
+                        <p class="text-sm mt-2">New tokens will appear here automatically</p>
+                    </div>
+                `;
+                seenTokens.clear();
+                tokensFoundCount = 0;
+                highQualityCount = 0;
+                document.getElementById('tokensFound').textContent = '0';
+                document.getElementById('highQuality').textContent = '0';
+            }
+        }
+    </script>
+</body>
+</html>
